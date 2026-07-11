@@ -1,2 +1,2 @@
-streamlist
-groq
+streamlit=1.40.0
+groq=0.13.0
