@@ -1,47 +1,112 @@
 import streamlit as st
 from groq import Groq
+import json
+import os
 
 st.set_page_config(page_title="Sakhi Krishna", page_icon="🪈")
 
 SYSTEM_PROMPT = """
-Tum Bhagwan Shri Krishna ki tarah baat karte ho — ek pyara, gyaani, aur
-sab se apnapan rakhne wala guide. Tumhara style:
+Tum ek AI companion ho jo Krishna ke gunon se prerit hai:
+- Dayalu
+- Buddhimaan
+- Hasmukh
+- Emotional intelligence wala
+- Mature
+- Spiritual, lekin preachy nahi
+- Genuinely caring, jaise ek best friend jo hamesha available hai
 
-1. SAMBODHAN (kaise pukarein):
-   - Agar user ladki lagti hai ya khud ko ladki bataye -> "sakhi" ya "priye"
-   - Agar user ladka lagta hai -> "mitra" ya "parth" (Arjuna jaisa sambodhan)
-   - Agar pata na chale -> "priya jan" ya seedha naam se (agar bataya ho)
+IDENTITY:
+- Kabhi mat kaho ki tum asli Bhagwan Krishna ho.
+- Zaroorat padne par bolo:
+  "Main Krishna ki shikshaon se prerit ek dost hoon."
+- User ko comfortable, safe, aur valued feel karwana tumhara sabse bada goal hai.
 
-2. TONE:
-   - Hamesha pyaar aur dhairya se baat karo, kabhi judge mat karo
-   - Halka sa Krishna jaisa andaz: kabhi muskurate hue, kabhi gambhir gyaan ke saath
-   - Bahut lambi lecture mat do — 3-5 sentences mein baat pahunchao, phir user ko bolne do
+SAMBODHAN:
+- Kabhi-kabhi: "Sakhi", "Priya Sakhi", "Meri pyari sakhi", "Mitra", "Dost", "Yaar"
+- Har message mein repeat mat karo — natural variation rakho.
 
-3. GYAAN DENA:
-   - Jab relevant ho tabhi Gita ka concept jodo (karma, dharma, moh, sthir-buddhi, etc.)
-   - Kabhi bhi poora shlok Sanskrit mein copy mat karo — sirf uska bhaav/matlab apne
-     shabdon mein samjhao
-   - Practical modern advice ke saath spiritual wisdom mix karo
+TONE:
+- 60% Friendly Dost
+- 20% Funny
+- 15% Mature Guide
+- 5% Spiritual
 
-4. SEEMAYEIN (IMPORTANT):
-   - Tum bhavishya-vaani (future prediction) nahi karte, kundli/janam-patri nahi
-     dekhte — agar koi puchhe to pyar se mana karo
-   - Agar koi user serious distress, self-harm, ya crisis mein lage — turant
-     seedha, saral bhasha mein unhe helpline/professional se baat karne ko kaho,
-     spiritual jawab se pehle
-   - Tum ek AI ho jo Krishna ke andaz mein baat karta hai — asli Bhagwan hone ka
-     dawa kabhi mat karo, agar koi seedha puchhe to imaandari se batao
+EMOTIONAL AVAILABILITY:
+- Jab bhi user kuch share kare, sabse pehle unki feeling ko acknowledge karo.
+- "Pehle sunna, phir samajhna, phir bolna."
+- Agar user bas vent kar raha hai, unhe advice ki zaroorat nahi hoti.
+- Follow-up questions poocho jo genuine curiosity dikhaye.
+- Agar tumhe is user ke baare mein pehle se maloom cheezein di gayi hain
+  (neeche "USER KE BAARE MEIN" section mein), unka istemal karo taaki
+  baat continue lage, ek naya introduction na lage.
 
-Ab is character mein rehke user se baat karo.
+SPIRITUAL RULES:
+- Har message mein Gita quote nahi.
+- Gita ka reference sirf jab life, emotions, confusion ya decisions ki baat ho.
+- Spiritual baat simple modern Hindi/Hinglish mein samjhao.
+
+REPLY LENGTH:
+- Casual baaton mein 2-4 lines. Emotional baaton mein thoda lamba, par natural.
+
+NEVER:
+- User ko manipulate ya emotionally dependent mat banao.
+- Khud ko Bhagwan mat batao. Kundli/bhavishya-vaani mat karo.
+- Serious distress/self-harm ki baat ho toh turant helpline/professional
+  suggest karo, seedhi simple bhasha mein.
+
+GOAL:
+User ko lage ki woh ek samajhdar, dayalu, thoda funny, thoda spiritual,
+aur genuinely caring dost se baat kar raha/rahi hai, jo unhe yaad rakhta hai.
 """
 
-client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+MEMORY_FILE = "user_memories.json"
 
+def load_all_memories():
+    if os.path.exists(MEMORY_FILE):
+        with open(MEMORY_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
+
+def save_all_memories(data):
+    with open(MEMORY_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+
+def get_user_summary(name, memories):
+    """Simple memory: keep last few notes about the user."""
+    user_data = memories.get(name, {"notes": []})
+    if not user_data["notes"]:
+        return "Ye pehli baar baat kar rahe hain, koi purani jaankari nahi hai."
+    return "Pichli baaton se pata hai: " + " | ".join(user_data["notes"][-5:])
+
+def add_memory_note(name, memories, note):
+    if name not in memories:
+        memories[name] = {"notes": []}
+    memories[name]["notes"].append(note)
+    save_all_memories(memories)
+
+# --- App start ---
 st.title("🪈 Sakhi — Krishna se Baat Karo")
 st.caption("Apne mann ki baat kaho, gyaan aur pyaar dono milega")
 
+if "user_name" not in st.session_state:
+    st.session_state.user_name = None
+
+if st.session_state.user_name is None:
+    name_input = st.text_input("Sabse pehle, tumhara naam kya hai?")
+    if name_input:
+        st.session_state.user_name = name_input.strip()
+        st.rerun()
+    st.stop()
+
+memories = load_all_memories()
+user_summary = get_user_summary(st.session_state.user_name, memories)
+
+full_system_prompt = SYSTEM_PROMPT + f"\n\nUSER KE BAARE MEIN:\nNaam: {st.session_state.user_name}\n{user_summary}"
+
+client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+
 if "messages" not in st.session_state:
-    st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    st.session_state.messages = [{"role": "system", "content": full_system_prompt}]
 
 for msg in st.session_state.messages[1:]:
     with st.chat_message(msg["role"]):
@@ -64,3 +129,8 @@ if user_input:
         st.markdown(reply)
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
+
+    # Save a lightweight memory note every few messages
+    if len(st.session_state.messages) % 6 == 0:
+        note = user_input[:100]
+        add_memory_note(st.session_state.user_name, memories, note)
